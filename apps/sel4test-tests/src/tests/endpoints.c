@@ -159,6 +159,12 @@ static int ep_test_func(seL4_CPtr sync_ep, seL4_CPtr test_ep, volatile seL4_Word
     return sel4test_get_result();
 }
 
+#ifdef CBS0002_DEBUG
+#define debug_printf(__fmt__, ...) do { printf(__fmt__, ##__VA_ARGS__); } while (0)
+#else
+#define debug_printf(__fmt__, ...) do { }  while (0)
+#endif
+
 /* CANCEL_BADGED_SENDS_0001 only tests if a thread gets its IPC canceled. The IPC
  * can succeed even if the cap it used got deleted provided the final
  * capability was not cancelBadgedSendsd (thus causing an IPC cancel to happen)
@@ -216,10 +222,14 @@ static int test_ep_cancelBadgedSends2(env_t env)
     }
     /* Now start recycling endpoints and make sure the correct endpoints disappear */
     for (int i = 0 ; i < NUM_BADGED_CLIENTS; i++) {
+        debug_printf("CBS0002:REVOKE_START:%d\n", i);
         error = cnode_revoke(env, helpers[i].badged_ep);
+        debug_printf("CBS0002:REVOKE_END:%d\n", i);
         test_eq(error, seL4_NoError);
         /* cancelBadgedSends an ep */
+        debug_printf("CBS0002:CANCEL_START:%d\n", i);
         error = cnode_cancelBadgedSends(env, helpers[i].badged_ep);
+        debug_printf("CBS0002:CANCEL_END:%d\n", i);
         assert(!error);
         /* Now run every thread */
         for (int j = 0; j < NUM_BADGED_CLIENTS; j++) {
