@@ -278,9 +278,13 @@ void sel4test_stop_tests(test_result_t result, int tests_done, int tests_failed,
 
 /* ========== RAS ERROR STRESS TEST ========== */
 /* Set to 0 to run full test suite, >0 to run stress tests */
-#define RAS_STRESS_REPEAT 100
+#ifndef RAS_STRESS_REPEAT
+#define RAS_STRESS_REPEAT 0
+#endif
 /* Set to 1 for sequential mode (AAA BBB CCC), 0 for interleaved (ABCD ABCD) */
-#define RAS_STRESS_SEQUENTIAL 0
+#ifndef RAS_STRESS_SEQUENTIAL
+#define RAS_STRESS_SEQUENTIAL 1
+#endif
 static const char *ras_stress_tests[] = {
     /* Test CANCEL_BADGED_SENDS which triggers rapid VTTBR switching */
     "CANCEL_BADGED_SENDS_0002",

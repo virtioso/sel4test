@@ -57,3 +57,8 @@ target_link_libraries(
         sel4serialserver_tests
     PRIVATE sel4test-driver_Config
 )
+
+# RAS debug: enable CANCEL_BADGED_SENDS debug output
+if(Sel4testRasDebug)
+    target_compile_definitions(sel4test-tests PRIVATE CBS0002_DEBUG)
+endif()

@@ -58,6 +58,14 @@ config_option(
     DEFAULT
     ON
 )
+
+config_option(
+    Sel4testRasDebug
+    RAS_DEBUG
+    "Enable RAS stress test loop for debugging Orin AGX RAS errors"
+    DEFAULT
+    OFF
+)
 if(Sel4testAllowSettingsOverride)
     mark_as_advanced(CLEAR Sel4testHaveTimer Sel4testHaveCache)
 else()
@@ -102,6 +110,11 @@ target_link_libraries(
     PRIVATE sel4test-driver_Config
 )
 target_compile_options(sel4test-driver PRIVATE -Werror -g)
+
+# RAS debug stress test configuration
+if(Sel4testRasDebug)
+    target_compile_definitions(sel4test-driver PRIVATE RAS_STRESS_REPEAT=100 RAS_STRESS_SEQUENTIAL=1)
+endif()
 
 # Set this image as the rootserver
 include(rootserver)
