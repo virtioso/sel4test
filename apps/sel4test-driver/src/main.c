@@ -276,6 +276,45 @@ void sel4test_stop_tests(test_result_t result, int tests_done, int tests_failed,
     printf("\n\n");
 }
 
+/* ========== RAS ERROR STRESS TEST ========== */
+/* Set to 0 to run full test suite, >0 to run stress tests */
+#define RAS_STRESS_REPEAT 100
+/* Set to 1 for sequential mode (AAA BBB CCC), 0 for interleaved (ABCD ABCD) */
+#define RAS_STRESS_SEQUENTIAL 0
+static const char *ras_stress_tests[] = {
+    /* Test CANCEL_BADGED_SENDS which triggers rapid VTTBR switching */
+    "CANCEL_BADGED_SENDS_0002",
+    /* FPU multithreaded test */
+    "FPU0001",
+    /* Thread lifecycle tests */
+    "THREAD_LIFECYCLE_0001",
+    "THREAD_LIFECYCLE_RAPID_0001",
+};
+#define RAS_STRESS_NUM_TESTS 4
+
+/* Helper: find test by name */
+static testcase_t *find_test_by_name(testcase_t **tests, int num, const char *name)
+{
+    for (int i = 0; i < num; i++) {
+        if (strcmp(tests[i]->name, name) == 0) {
+            return tests[i];
+        }
+    }
+    return NULL;
+}
+
+/* Helper: find test type by ID */
+static struct test_type *find_test_type_by_id(struct test_type **types, int num, int id)
+{
+    for (int i = 0; i < num; i++) {
+        if (types[i]->id == id) {
+            return types[i];
+        }
+    }
+    return NULL;
+}
+/* ========== END RAS STRESS TEST HELPERS ========== */
+
 static int collate_tests(testcase_t *tests_in, int n, testcase_t *tests_out[], int out_index,
                          regex_t *reg, int *skipped_tests)
 {
@@ -355,6 +394,109 @@ void sel4test_run_tests(struct driver_env *e)
     test_gt(num_tests, 0);
     sel4test_end_test(sel4test_get_result());
     tests_done++;
+
+    /* ========== RAS STRESS TEST LOOP ========== */
+#if RAS_STRESS_REPEAT > 0
+    printf("\n========================================\n");
+    printf("RAS STRESS TEST: %d iterations\n", RAS_STRESS_REPEAT);
+#if RAS_STRESS_SEQUENTIAL
+    printf("Mode: SEQUENTIAL (AAA BBB CCC DDD)\n");
+#else
+    printf("Mode: INTERLEAVED (ABCD ABCD ABCD)\n");
+#endif
+    printf("========================================\n");
+
+    struct test_type *basic_type = find_test_type_by_id(test_types, num_test_types, BASIC);
+    if (basic_type == NULL) {
+        printf("ERROR: BASIC test type not found!\n");
+    } else {
+        /* Set up BASIC test type once */
+        if (basic_type->set_up_test_type != NULL) {
+            basic_type->set_up_test_type((uintptr_t)e);
+        }
+
+#if RAS_STRESS_SEQUENTIAL
+        /* Sequential mode: AAA BBB CCC DDD - each test runs N times before next */
+        for (int st = 0; st < RAS_STRESS_NUM_TESTS; st++) {
+            testcase_t *test = find_test_by_name(tests, num_tests, ras_stress_tests[st]);
+            if (test == NULL) {
+                printf("WARNING: Test %s not found, skipping\n", ras_stress_tests[st]);
+                continue;
+            }
+
+            printf("\n=== Test %s: %d iterations ===\n", test->name, RAS_STRESS_REPEAT);
+
+            for (int rep = 0; rep < RAS_STRESS_REPEAT; rep++) {
+                sel4test_start_test(test->name, tests_done);
+
+                if (basic_type->set_up != NULL) {
+                    basic_type->set_up((uintptr_t)e);
+                }
+
+                test_result_t result = basic_type->run_test(test, (uintptr_t)e);
+
+                if (basic_type->tear_down != NULL) {
+                    basic_type->tear_down((uintptr_t)e);
+                }
+
+                sel4test_end_test(result);
+
+                if (result != SUCCESS) {
+                    tests_failed++;
+                }
+                tests_done++;
+            }
+        }
+#else
+        /* Interleaved mode: ABCD ABCD ABCD - all tests run each iteration */
+        for (int rep = 0; rep < RAS_STRESS_REPEAT; rep++) {
+            printf("\n=== Stress iteration %d/%d ===\n", rep + 1, RAS_STRESS_REPEAT);
+
+            for (int st = 0; st < RAS_STRESS_NUM_TESTS; st++) {
+                testcase_t *test = find_test_by_name(tests, num_tests, ras_stress_tests[st]);
+                if (test == NULL) {
+                    printf("WARNING: Test %s not found, skipping\n", ras_stress_tests[st]);
+                    continue;
+                }
+
+                sel4test_start_test(test->name, tests_done);
+
+                if (basic_type->set_up != NULL) {
+                    basic_type->set_up((uintptr_t)e);
+                }
+
+                test_result_t result = basic_type->run_test(test, (uintptr_t)e);
+
+                if (basic_type->tear_down != NULL) {
+                    basic_type->tear_down((uintptr_t)e);
+                }
+
+                sel4test_end_test(result);
+
+                if (result != SUCCESS) {
+                    tests_failed++;
+                }
+                tests_done++;
+            }
+        }
+#endif
+
+        /* Tear down BASIC test type */
+        if (basic_type->tear_down_test_type != NULL) {
+            basic_type->tear_down_test_type((uintptr_t)e);
+        }
+    }
+
+    printf("\n========================================\n");
+    printf("RAS STRESS TEST COMPLETE\n");
+    printf("Tests run: %d, Failed: %d\n", tests_done, tests_failed);
+    printf("========================================\n\n");
+
+    /* Skip normal tests - only run stress test */
+    sel4test_stop_tests(SUCCESS, tests_done, tests_failed, tests_done, 0);
+    return;
+#endif
+    /* ========== END RAS STRESS TEST LOOP ========== */
 
     /* Iterate through test types so that we run them in order of test type, then name.
        * Test types are ordered by ID in test.h. */
