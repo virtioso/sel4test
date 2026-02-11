@@ -625,6 +625,11 @@ void *main_continued(void *arg UNUSED)
     /* now run the tests */
     sel4test_run_tests(&env);
 
+#ifdef CONFIG_BENCHMARK_GENERIC
+    /* Force a deterministic benchmark/ftrace finalization point for trace dumps. */
+    (void)seL4_BenchmarkFinalizeLog();
+#endif
+
     return NULL;
 }
 
