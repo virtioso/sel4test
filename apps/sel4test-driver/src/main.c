@@ -622,6 +622,11 @@ void *main_continued(void *arg UNUSED)
         ZF_LOGF_IF(error, "Failed to allocate reply");
     }
 
+#ifdef CONFIG_ENABLE_BENCHMARKS
+    /* Start a fresh benchmark/ftrace window for this sel4test run. */
+    (void)seL4_BenchmarkResetLog();
+#endif
+
     /* now run the tests */
     sel4test_run_tests(&env);
 
