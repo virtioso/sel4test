@@ -9,6 +9,7 @@
 #include <sel4test-driver/gen_config.h>
 
 #include <sel4debug/register_dump.h>
+#include <sel4utils/vspace_internal.h>
 #include <vka/capops.h>
 
 #include "test.h"
@@ -301,8 +302,13 @@ test_result_t basic_run_test(struct testcase *test, uintptr_t e)
 void basic_tear_down(uintptr_t e)
 {
     driver_env_t env = (driver_env_t)e;
+    orin_proof_clear_reason_t previous_reason;
+
     /* unmap the env->init data frame */
+    previous_reason = orin_proof_set_clear_reason(
+                          ORIN_PROOF_CLEAR_REASON_SEL4TEST_BASIC_TEARDOWN_SHARED_INIT);
     vspace_unmap_pages(&(env->test_process).vspace, env->remote_vaddr, 1, PAGE_BITS_4K, NULL);
+    orin_proof_restore_clear_reason(previous_reason);
 
     /* reset all the untypeds for the next test */
     for (int i = 0; i < env->num_untypeds; i++) {
@@ -316,4 +322,3 @@ void basic_tear_down(uintptr_t e)
 }
 
 DEFINE_TEST_TYPE(BASIC, BASIC, NULL, NULL, basic_set_up, basic_tear_down, basic_run_test);
-
